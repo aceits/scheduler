@@ -88,6 +88,8 @@ var (
 	// ErrRangeMonth is returned when Month method argument is not int
 	ErrRangeMonth = errors.New("argument 1 <= n <= 12 in Month method")
 
+	ErrRangeExceeds = errors.New("job delay duration takes more than 24 hour")
+
 	// EmptyJobType represents an empty job type
 	EmptyJobType = ""
 
@@ -246,12 +248,15 @@ func (j *Job) Do(fn interface{}, args ...interface{}) (jobID string) {
 				second += j.Sched[Minute] * 60
 			case Hour:
 				second += j.Sched[Hour] * 60 * 60
-			case Day:
-				second += j.Sched[Day] * 60 * 60 * 24
 			default:
 				panic(ErrJobSched)
 			}
 		}
+
+		if second > 86400 {
+			panic(ErrRangeExceeds)
+		}
+
 		// initial job.JTimer (note: can not put it in a new goroutine)
 		j.JTimer = new(JobTimer)
 		j.JTimer.ID = generateID()
