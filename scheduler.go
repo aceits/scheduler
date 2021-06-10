@@ -129,6 +129,17 @@ func (js *JobSet) setJobDone(id string) {
 	}
 }
 
+// removePendingJob When a job is cancelled then remove from pending set.
+func (js *JobSet) removePendingJob(id string) {
+	js.lock.Lock()
+	defer js.lock.Unlock()
+
+	job := js.pendingSet[id]
+	if job.Type != Every {
+		delete(js.pendingSet, id)
+	}
+}
+
 // Job
 
 // JobTimer is the wrapper for time.Timer, one job corresponds to a JobTimer.
@@ -431,6 +442,7 @@ func (s *Scheduler) CancelJob(id string) error {
 	case Delay:
 		ok := job.JTimer.timer.Stop()
 		if ok {
+			jobSet.removePendingJob(job.ID)
 			return nil
 		}
 		return ErrCancelJob
