@@ -98,7 +98,7 @@ var (
 
 	// jobSet is a instance of JobSet
 	jobSet = &JobSet{
-		lock:         new(sync.Mutex),
+		lock:         new(sync.RWMutex),
 		pendingSet:   map[string]*Job{},
 		completedSet: map[string]bool{},
 	}
@@ -108,7 +108,7 @@ var (
 
 // JobSet stores pending jobs and completed jobs and it is concurrent safly.
 type JobSet struct {
-	lock         *sync.Mutex     // ensure concurrent safe
+	lock         *sync.RWMutex     // ensure concurrent safe
 	pendingSet   map[string]*Job // storage pending jobs
 	completedSet map[string]bool // storage completed jobs
 }
@@ -432,17 +432,26 @@ func (s *Scheduler) JobDone(id string) (bool, error) {
 
 // CancelJob can cancel the job before scheduling.
 func (s *Scheduler) CancelJob(id string) error {
-	// can not cancel a completed job
-	if _, ok := s.js.completedSet[id]; ok {
+
+	s.js.lock.RLock()
+	_, ok := s.js.completedSet[id]
+	s.js.lock.RUnlock()
+
+	// cannot cancel a completed job
+	if ok {
 		return ErrAlreadyComplayed
 	}
-	// can not cancel a nonexistent job
-	if _, ok := s.js.pendingSet[id]; !ok {
+
+	s.js.lock.RLock()
+	job, ok := s.js.pendingSet[id]
+	s.js.lock.RUnlock()
+
+	// cannot cancel a nonexistent job
+	if !ok {
 		return ErrPendingJob
 	}
 
 	// cancel by job type
-	job := s.js.pendingSet[id]
 	switch job.Type {
 	case Delay:
 		ok := job.JTimer.timer.Stop()
